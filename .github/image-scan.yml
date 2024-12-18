@@ -1,0 +1,7 @@
+name: 'CFPB Image Scan'
+description: 'Scan images for vulnerabilities using CFPB's Image-Scan Tool'
+inputs:
+  word: 
+    description: 'Word to search for in the image scan results'
+    required: true
+    default: 'test'
