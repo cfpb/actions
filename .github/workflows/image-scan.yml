@@ -1,10 +1,10 @@
-name: hello-world
+name: Deploy CF.gov to EKS
 on: 
   push:
-jobs:
-  my-job:
+jobs: 
+  build: 
     runs-on: 
-      - cfpb-cfgov-cfpb-actions-gha-${{ github.run_id }}-${{ github.run_attempt }}
+      - codebuild-cfpb-cfgov-actions-gha-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: my-step
         run: echo "Hello World!"
