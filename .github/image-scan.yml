@@ -1,7 +1,8 @@
-name: 'CFPB Image Scan'
-description: 'Scan images for vulnerabilities using CFPB's Image-Scan Tool'
-inputs:
-  word: 
-    description: 'Word to search for in the image scan results'
-    required: true
-    default: 'test'
+name: hello-world
+on: push
+jobs:
+  my-job:
+    runs-on: cfpb-cfgov-cfpb-actions-gha-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: my-step
+        run: echo "Hello World!"
