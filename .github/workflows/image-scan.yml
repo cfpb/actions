@@ -1,8 +1,10 @@
 name: hello-world
-on: push
+on: 
+  push:
 jobs:
   my-job:
-    runs-on: cfpb-cfgov-cfpb-actions-gha-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: 
+    - cfpb-cfgov-cfpb-actions-gha-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: my-step
         run: echo "Hello World!"
