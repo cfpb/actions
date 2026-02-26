@@ -1,0 +1,90 @@
+name: Docker Metadata
+description: Compute standardized Docker image tags
+
+inputs:
+  image-name:
+    description: Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)
+    required: true
+  registry:
+    description: Container registry
+    required: false
+    default: ghcr.io
+
+outputs:
+  short-sha:
+    description: Short commit SHA
+    value: ${{ steps.compute.outputs.short-sha }}
+  registry-image:
+    description: Full registry path without tag (e.g. ghcr.io/cfpb/myapp)
+    value: ${{ steps.compute.outputs.registry-image }}
+  mutable-version:
+    description: Mutable tag, version only (e.g. "main", "pr-42", "v1.2.3")
+    value: ${{ steps.compute.outputs.mutable-version }}
+  mutable-tag:
+    description: Mutable tag (e.g. ghcr.io/cfpb/myapp:main)
+    value: ${{ steps.compute.outputs.mutable-tag }}
+  sha-version:
+    description: SHA-based tag, version only (e.g. "main-abc1234", "pr-42-abc1234")
+    value: ${{ steps.compute.outputs.sha-version }}
+  sha-tag:
+    description: SHA-based tag (e.g. ghcr.io/cfpb/myapp:main-abc1234)
+    value: ${{ steps.compute.outputs.sha-tag }}
+  tags:
+    description: All image tags, comma-separated
+    value: ${{ steps.compute.outputs.tags }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute metadata
+      id: compute
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        echo "short-sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+        OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+        REGISTRY_IMAGE="${{ inputs.registry }}/${OWNER_LOWER}/${{ inputs.image-name }}"
+        echo "registry-image=$REGISTRY_IMAGE" >> $GITHUB_OUTPUT
+
+        # For pushes to main, tag with: main, main-<sha>, latest
+        if [[ "${{ github.event_name }}" == "push"  && "${{ github.ref }}" == "refs/heads/main" ]]; then
+          MUTABLE_VERSION="main"
+          MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
+          SHA_VERSION="${MUTABLE_VERSION}-${SHORT_SHA}"
+          SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
+          TAGS="${MUTABLE_TAG},${SHA_TAG},${REGISTRY_IMAGE}:latest"
+
+        # For PRs, tag with: pr-<pr-num>, pr-<pr-num>-<sha>
+        elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          PR_NUM="${{ github.event.pull_request.number }}"
+          MUTABLE_VERSION="pr-${PR_NUM}"
+          MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
+          SHA_VERSION="${MUTABLE_VERSION}-${SHORT_SHA}"
+          SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
+          TAGS="${MUTABLE_TAG},${SHA_TAG}"
+
+        # For tags, tag with tag reference
+        elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          MUTABLE_VERSION="${{ github.ref_name }}"
+          MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
+          SHA_VERSION="${MUTABLE_VERSION}"
+          SHA_TAG="${MUTABLE_TAG}"
+          TAGS="${MUTABLE_TAG}"
+
+        # Otherwise, leave outputs empty.
+        else
+          MUTABLE_VERSION=""
+          MUTABLE_TAG=""
+          SHA_VERSION=""
+          SHA_TAG=""
+          TAGS=""
+        fi
+
+        echo "mutable-version=$MUTABLE_VERSION" >> $GITHUB_OUTPUT
+        echo "mutable-tag=$MUTABLE_TAG" >> $GITHUB_OUTPUT
+        echo "sha-version=$SHA_VERSION" >> $GITHUB_OUTPUT
+        echo "sha-tag=$SHA_TAG" >> $GITHUB_OUTPUT
+        echo "tags=$TAGS" >> $GITHUB_OUTPUT
