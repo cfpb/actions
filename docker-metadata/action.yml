@@ -48,23 +48,24 @@ runs:
         fi
 
         SHORT_SHA=$(git rev-parse --short HEAD)
+        DATE=$(date -u +%Y%m%d)
         OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
         REGISTRY_IMAGE="${{ inputs.registry }}/${OWNER_LOWER}/${{ inputs.image-name }}"
 
-        # For pushes to main, tag with: main, main-<sha>, latest
+        # For pushes to main, tag with: main, main-<date>-<sha>, latest
         if [[ "${{ github.event_name }}" == "push"  && "${{ github.ref }}" == "refs/heads/main" ]]; then
           MUTABLE_VERSION="main"
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
-          SHA_VERSION="${MUTABLE_VERSION}-${SHORT_SHA}"
+          SHA_VERSION="${MUTABLE_VERSION}-${DATE}-${SHORT_SHA}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
           TAGS="${MUTABLE_TAG},${SHA_TAG},${REGISTRY_IMAGE}:latest"
 
-        # For PRs, tag with: pr-<pr-num>, pr-<pr-num>-<sha>
+        # For PRs, tag with: pr-<pr-num>, pr-<pr-num>-<date>-<sha>
         elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
           PR_NUM="${{ github.event.pull_request.number }}"
           MUTABLE_VERSION="pr-${PR_NUM}"
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
-          SHA_VERSION="${MUTABLE_VERSION}-${SHORT_SHA}"
+          SHA_VERSION="${MUTABLE_VERSION}-${DATE}-${SHORT_SHA}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
           TAGS="${MUTABLE_TAG},${SHA_TAG}"
 
