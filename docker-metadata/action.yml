@@ -47,10 +47,17 @@ runs:
           exit 1
         fi
 
-        SHORT_SHA=$(git rev-parse --short HEAD)
         DATE=$(date -u +%Y%m%d)
         OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
         REGISTRY_IMAGE="${{ inputs.registry }}/${OWNER_LOWER}/${{ inputs.image-name }}"
+
+        # For PRs, make sure to use the actual PR commit SHA.
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          SHA="${{ github.event.pull_request.head.sha }}"
+        else
+          SHA="${{ github.sha }}"
+        fi
+        SHORT_SHA=${SHA:0:7}
 
         # For pushes to main, tag with: main, main-<date>-<sha>, latest
         if [[ "${{ github.event_name }}" == "push"  && "${{ github.ref }}" == "refs/heads/main" ]]; then
