@@ -42,6 +42,11 @@ runs:
       run: |
         set -euo pipefail
 
+        if [ -z "${{ inputs.image-name }}" ]; then
+          echo "Error: input image-name must be defined"
+          exit 1
+        fi
+
         SHORT_SHA=$(git rev-parse --short HEAD)
         OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
         REGISTRY_IMAGE="${{ inputs.registry }}/${OWNER_LOWER}/${{ inputs.image-name }}"
