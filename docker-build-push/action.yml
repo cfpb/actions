@@ -1,0 +1,202 @@
+name: Docker Build and Push
+description: Build, optionally test, and push a Docker image to GHCR
+
+inputs:
+  image-name:
+    description: Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)
+    required: true
+  context:
+    description: Docker build context
+    required: false
+    default: '.'
+  skip-push:
+    description: 'Skip image push even if conditions are met (default: false)'
+    required: false
+    default: false
+  test-command:
+    description: 'Test command to run against built image. Receives IMAGE env var.'
+    required: false
+    default: ''
+
+outputs:
+  short-sha:
+    description: 'Short commit SHA'
+    value: ${{ steps.compute.outputs.short-sha }}
+  registry-image:
+    description: 'Full registry path without tag (e.g. ghcr.io/cfpb/myapp)'
+    value: ${{ steps.compute.outputs.registry-image }}
+  mutable-version:
+    description: 'Mutable tag, version only (e.g. "main", "pr-42", "v1.2.3")'
+    value: ${{ steps.compute.outputs.mutable-version }}
+  mutable-tag:
+    description: 'Mutable tag (e.g. ghcr.io/cfpb/myapp:main)'
+    value: ${{ steps.compute.outputs.mutable-tag }}
+  sha-version:
+    description: 'SHA-based tag, version only (e.g. "main-abc1234", "pr-42-abc1234")'
+    value: ${{ steps.compute.outputs.sha-version }}
+  sha-tag:
+    description: 'SHA-based tag (e.g. ghcr.io/cfpb/myapp:main-abc1234)'
+    value: ${{ steps.compute.outputs.sha-tag }}
+  tags:
+    description: 'All pushable tags, comma-separated'
+    value: ${{ steps.compute.outputs.tags }}
+  digest:
+    description: 'Image digest'
+    value: ${{ steps.push.outputs.digest }}
+  pushed:
+    description: 'Whether the image was pushed'
+    value: ${{ steps.should-push.outputs.should-push }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute metadata
+      id: metadata
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [ -z "${{ inputs.image-name }}" ]; then
+          echo "Error: input image-name must be defined"
+          exit 1
+        fi
+
+        DATE=$(date -u +%Y%m%d)
+        OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+        REGISTRY_IMAGE="ghcr.io/${OWNER_LOWER}/${{ inputs.image-name }}"
+
+        # For PRs, make sure to use the actual PR commit SHA.
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          SHA="${{ github.event.pull_request.head.sha }}"
+        else
+          SHA="${{ github.sha }}"
+        fi
+        SHORT_SHA=${SHA:0:7}
+
+        # For pushes to main, tag with: main, main-<date>-<sha>, latest
+        if [[ "${{ github.event_name }}" == "push"  && "${{ github.ref }}" == "refs/heads/main" ]]; then
+          MUTABLE_VERSION="main"
+          MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
+          SHA_VERSION="${MUTABLE_VERSION}-${DATE}-${SHORT_SHA}"
+          SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
+          TAGS="${MUTABLE_TAG},${SHA_TAG},${REGISTRY_IMAGE}:latest"
+
+        # For PRs, tag with: pr-<pr-num>, pr-<pr-num>-<date>-<sha>
+        elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          PR_NUM="${{ github.event.pull_request.number }}"
+          MUTABLE_VERSION="pr-${PR_NUM}"
+          MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
+          SHA_VERSION="${MUTABLE_VERSION}-${DATE}-${SHORT_SHA}"
+          SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
+          TAGS="${MUTABLE_TAG},${SHA_TAG}"
+
+        # For tags, tag with tag reference
+        elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          MUTABLE_VERSION="${{ github.ref_name }}"
+          MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
+          SHA_VERSION="${MUTABLE_VERSION}"
+          SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
+          TAGS="${MUTABLE_TAG}"
+
+        # Otherwise, use "local" for local build only, no tags.
+        else
+          MUTABLE_VERSION="local"
+          MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
+          SHA_VERSION="local"
+          SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
+          TAGS=""
+        fi
+
+        # Set step output variables.
+        echo "short-sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+        echo "registry-image=$REGISTRY_IMAGE" >> $GITHUB_OUTPUT
+        echo "mutable-version=$MUTABLE_VERSION" >> $GITHUB_OUTPUT
+        echo "mutable-tag=$MUTABLE_TAG" >> $GITHUB_OUTPUT
+        echo "sha-version=$SHA_VERSION" >> $GITHUB_OUTPUT
+        echo "sha-tag=$SHA_TAG" >> $GITHUB_OUTPUT
+        echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+        # Markdown output for job summaries.
+        echo "### Image metadata" >> $GITHUB_STEP_SUMMARY
+        echo "|Variable|Value" >> $GITHUB_STEP_SUMMARY
+        echo "|-|-|" >> $GITHUB_STEP_SUMMARY
+        echo "|short-sha|\`$SHORT_SHA\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|registry-image|\`$REGISTRY_IMAGE\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|mutable-version|\`$MUTABLE_VERSION\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|mutable-tag|\`$MUTABLE_TAG\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|sha-version|\`$SHA_VERSION\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|sha-tag|\`$SHA_TAG\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|tags|\`$TAGS\`|" >> $GITHUB_STEP_SUMMARY
+
+    - name: Check if should push
+      id: should-push
+      shell: bash
+      run: |
+        SKIP="${{ inputs.skip-push }}"
+        TAGS="${{ steps.metadata.outputs.tags }}"
+        EVENT="${{ github.event_name }}"
+        PR_HEAD="${{ github.event.pull_request.head.repo.full_name }}"
+        REPO="${{ github.repository }}"
+
+        if [[ "${SKIP,,}" == "true" ]]; then
+          echo "pushed=false" >> $GITHUB_OUTPUT
+        elif [[ -z "$TAGS" ]]; then
+          echo "pushed=false" >> $GITHUB_OUTPUT
+        elif [[ "$EVENT" == "pull_request" && "$PR_HEAD" != "$REPO" ]]; then
+          echo "pushed=false" >> $GITHUB_OUTPUT
+        else
+          echo "pushed=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build image
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        load: true
+        push: false
+        pull: true
+        tags: ${{ steps.metadata.outputs.tags || steps.metadata.outputs.mutable-tag }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run tests
+      if: inputs.test-command != ''
+      shell: bash
+      env:
+        IMAGE: ${{ steps.metadata.outputs.mutable-tag }}
+      run: |
+        echo "Running: ${{ inputs.test-command }}"
+        ${{ inputs.test-command }}
+
+    - name: Log in to registry
+      if: steps.should-push.outputs.pushed == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push image
+      id: push
+      if: steps.should-push.outputs.pushed == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "Pushing ${{ steps.metadata.outputs.registry-image }}"
+        docker push "${{ steps.metadata.outputs.registry-image }}" --all-tags
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "digest=${{ steps.build.outputs.digest }}" >> $GITHUB_OUTPUT
+
+        echo "### Build and push" >> $GITHUB_STEP_SUMMARY
+        echo "|Variable|Value" >> $GITHUB_STEP_SUMMARY
+        echo "|-|-|" >> $GITHUB_STEP_SUMMARY
+        echo "|digest|\`${{ steps.build.outputs.digest }}\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|pushed|\`${{ steps.should-push.outputs.pushed }}\`|" >> $GITHUB_STEP_SUMMARY
