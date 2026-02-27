@@ -43,11 +43,8 @@ runs:
         set -euo pipefail
 
         SHORT_SHA=$(git rev-parse --short HEAD)
-        echo "short-sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-
         OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
         REGISTRY_IMAGE="${{ inputs.registry }}/${OWNER_LOWER}/${{ inputs.image-name }}"
-        echo "registry-image=$REGISTRY_IMAGE" >> $GITHUB_OUTPUT
 
         # For pushes to main, tag with: main, main-<sha>, latest
         if [[ "${{ github.event_name }}" == "push"  && "${{ github.ref }}" == "refs/heads/main" ]]; then
@@ -83,8 +80,23 @@ runs:
           TAGS=""
         fi
 
+        # Set output variables for GitHub Actions step.
+        echo "short-sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+        echo "registry-image=$REGISTRY_IMAGE" >> $GITHUB_OUTPUT
         echo "mutable-version=$MUTABLE_VERSION" >> $GITHUB_OUTPUT
         echo "mutable-tag=$MUTABLE_TAG" >> $GITHUB_OUTPUT
         echo "sha-version=$SHA_VERSION" >> $GITHUB_OUTPUT
         echo "sha-tag=$SHA_TAG" >> $GITHUB_OUTPUT
         echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+        # Markdown output for job summaries.
+        echo "### docker-metadata" >> $GITHUB_STEP_SUMMARY
+        echo "|Variable|Value" >> $GITHUB_STEP_SUMMARY
+        echo "|-|-|" >> $GITHUB_STEP_SUMMARY
+        echo "|short-sha|$SHORT_SHA|" >> $GITHUB_STEP_SUMMARY
+        echo "|registry-image|$REGISTRY_IMAGE|" >> $GITHUB_STEP_SUMMARY
+        echo "|mutable-version|$MUTABLE_VERSION|" >> $GITHUB_STEP_SUMMARY
+        echo "|mutable-tag|$MUTABLE_TAG|" >> $GITHUB_STEP_SUMMARY
+        echo "|sha-version|$SHA_VERSION|" >> $GITHUB_STEP_SUMMARY
+        echo "|sha-tag|$SHA_TAG|" >> $GITHUB_STEP_SUMMARY
+        echo "|tags|$TAGS|" >> $GITHUB_STEP_SUMMARY
