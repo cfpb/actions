@@ -40,12 +40,12 @@ outputs:
   tags:
     description: 'All pushable tags, comma-separated'
     value: ${{ steps.compute.outputs.tags }}
-  digest:
-    description: 'Image digest'
-    value: ${{ steps.push.outputs.digest }}
   pushed:
     description: 'Whether the image was pushed'
     value: ${{ steps.should-push.outputs.should-push }}
+  digest:
+    description: 'Image digest (if pushed)'
+    value: ${{ steps.push.outputs.digest }}
 
 runs:
   using: composite
@@ -188,15 +188,15 @@ runs:
         set -euo pipefail
 
         echo "Pushing ${{ steps.metadata.outputs.registry-image }}"
-        docker push "${{ steps.metadata.outputs.registry-image }}" --all-tags
+        docker push "${{ steps.metadata.outputs.registry-image }}" --all-tags | tee $RUNNER_TEMP/docker-push.log
+        DIGEST=$(tail -1 $RUNNER_TEMP/docker-push.log | awk '{print $3}')
+        echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
     - name: Summary
       shell: bash
       run: |
-        echo "digest=${{ steps.build.outputs.digest }}" >> $GITHUB_OUTPUT
-
         echo "### Build and push" >> $GITHUB_STEP_SUMMARY
         echo "|Variable|Value" >> $GITHUB_STEP_SUMMARY
         echo "|-|-|" >> $GITHUB_STEP_SUMMARY
-        echo "|digest|\`${{ steps.build.outputs.digest }}\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|digest|\`${{ steps.push.outputs.digest }}\`|" >> $GITHUB_STEP_SUMMARY
         echo "|pushed|\`${{ steps.should-push.outputs.pushed }}\`|" >> $GITHUB_STEP_SUMMARY
