@@ -198,5 +198,6 @@ runs:
         echo "### Build and push" >> $GITHUB_STEP_SUMMARY
         echo "|Variable|Value" >> $GITHUB_STEP_SUMMARY
         echo "|-|-|" >> $GITHUB_STEP_SUMMARY
-        echo "|digest|\`${{ steps.push.outputs.digest }}\`|" >> $GITHUB_STEP_SUMMARY
+        DIGEST="${{ steps.push.outputs.digest }}"
+        [ -n "$DIGEST" ] && echo "|digest|\`$DIGEST\`|" >> $GITHUB_STEP_SUMMARY
         echo "|pushed|\`${{ steps.should-push.outputs.pushed }}\`|" >> $GITHUB_STEP_SUMMARY
