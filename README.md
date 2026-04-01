@@ -33,6 +33,7 @@ jobs:
       - uses: cfpb/actions/docker-build-push@main
         with:
           image-name: myapp
+          token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 #### Build with custom Docker context
@@ -41,6 +42,7 @@ jobs:
 - uses: cfpb/actions/docker-build-push@main
   with:
     image-name: myapp
+    token: ${{ secrets.GITHUB_TOKEN }}
     context: ./path/to/dockerfile/
 ```
 
@@ -50,6 +52,7 @@ jobs:
 - uses: cfpb/actions/docker-build-push@main
   with:
     image-name: myapp
+    token: ${{ secrets.GITHUB_TOKEN }}
     skip-push: true
 ```
 
@@ -61,6 +64,7 @@ Test command receives `IMAGE` as an environment variable.
 - uses: cfpb/actions/docker-build-push@main
   with:
     image-name: myapp
+    token: ${{ secrets.GITHUB_TOKEN }}
     test-command: my-test-command.sh
 ```
 
@@ -69,6 +73,7 @@ Test command receives `IMAGE` as an environment variable.
 | Input          | Required | Default | Description                                                        |
 | -------------- | -------- | ------- | ------------------------------------------------------------------ |
 | `image-name`   | Yes      | -       | Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)             |
+| `token`        | Yes      | -       | GitHub token for registry authentication                           |
 | `context`      | No       | `.`     | Docker build context                                               |
 | `skip-push`    | No       | `false` | Skip pushing (build only)                                          |
 | `test-command` | No       |         | Test command to run against built image. Receives `IMAGE` env var. |

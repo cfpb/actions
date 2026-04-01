@@ -5,6 +5,9 @@ inputs:
   image-name:
     description: Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)
     required: true
+  token:
+    description: GitHub token for registry authentication
+    required: true
   context:
     description: Docker build context
     required: false
@@ -178,7 +181,7 @@ runs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        password: ${{ inputs.token }}
 
     - name: Push image
       id: push
