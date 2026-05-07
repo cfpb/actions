@@ -75,6 +75,7 @@ runs:
           SHA="${{ github.sha }}"
         fi
         SHORT_SHA=${SHA:0:7}
+        SHORT_SHA_TAG="${REGISTRY_IMAGE}:${SHORT_SHA}"
 
         # For pushes to main, tag with: main, main-<date>-<sha>, latest
         if [[ "${{ github.event_name }}" == "push"  && "${{ github.ref }}" == "refs/heads/main" ]]; then
@@ -82,7 +83,7 @@ runs:
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
           SHA_VERSION="${MUTABLE_VERSION}-${DATE}-${SHORT_SHA}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
-          TAGS="${MUTABLE_TAG},${SHA_TAG},${REGISTRY_IMAGE}:latest"
+          TAGS="${SHORT_SHA_TAG},${MUTABLE_TAG},${SHA_TAG},${REGISTRY_IMAGE}:latest"
 
         # For PRs, tag with: pr-<pr-num>, pr-<pr-num>-<date>-<sha>
         elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -91,7 +92,7 @@ runs:
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
           SHA_VERSION="${MUTABLE_VERSION}-${DATE}-${SHORT_SHA}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
-          TAGS="${MUTABLE_TAG},${SHA_TAG}"
+          TAGS="${SHORT_SHA_TAG},${MUTABLE_TAG},${SHA_TAG}"
 
         # For tags, tag with tag reference
         elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
@@ -99,7 +100,7 @@ runs:
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
           SHA_VERSION="${MUTABLE_VERSION}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
-          TAGS="${MUTABLE_TAG}"
+          TAGS="${SHORT_SHA_TAG},${MUTABLE_TAG}"
 
         # Otherwise, use "local" for local build only, no tags.
         else
