@@ -14,7 +14,7 @@ Build, optionally test, and push a Docker image to GHCR.
 | ---------------- | ---------------------------------------------------- |
 | Push to `main`   | `latest`, `main`, `main-20260228-abc1234`, `abc1234` |
 | Pull request #42 | `pr-42`, `pr-42-20260228-abc1234`, `abc1234`         |
-| Git tag `v1.2.3` | `v1.2.3`                                             |
+| Git tag `v1.2.3` | `v1.2.3`, `abc1234`                                  |
 | Other            | `local`                                              |
 
 ### Usage
