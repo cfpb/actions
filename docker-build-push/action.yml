@@ -44,6 +44,9 @@ outputs:
   sha-tag:
     description: 'SHA-based tag (e.g. ghcr.io/cfpb/myapp:main-abc1234)'
     value: ${{ steps.compute.outputs.sha-tag }}
+  short-sha-tag:
+    description: 'Short commit SHA-based tag (e.g. ghcr.io/cfpb/myapp:abc1234)'
+    value: ${{ steps.compute.outputs.short-sha-tag }}
   tags:
     description: 'All pushable tags, comma-separated'
     value: ${{ steps.compute.outputs.tags }}
@@ -122,6 +125,7 @@ runs:
         echo "mutable-tag=$MUTABLE_TAG" >> $GITHUB_OUTPUT
         echo "sha-version=$SHA_VERSION" >> $GITHUB_OUTPUT
         echo "sha-tag=$SHA_TAG" >> $GITHUB_OUTPUT
+        echo "short-sha-tag=$SHORT_SHA_TAG" >> $GITHUB_OUTPUT
         echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
         # Markdown output for job summaries.
@@ -134,6 +138,7 @@ runs:
         echo "|mutable-tag|\`$MUTABLE_TAG\`|" >> $GITHUB_STEP_SUMMARY
         echo "|sha-version|\`$SHA_VERSION\`|" >> $GITHUB_STEP_SUMMARY
         echo "|sha-tag|\`$SHA_TAG\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|short-sha-tag|\`$SHORT_SHA_TAG\`|" >> $GITHUB_STEP_SUMMARY
         echo "|tags|\`$TAGS\`|" >> $GITHUB_STEP_SUMMARY
 
     - name: Check if should push

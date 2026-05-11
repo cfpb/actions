@@ -99,6 +99,7 @@ Test command receives `IMAGE` as an environment variable.
 | `mutable-tag`     | `ghcr.io/cfpb/myapp/main`, ...                                                |
 | `sha-version`     | `main-20260228-abc1234`, ...                                                  |
 | `sha-tag`         | `ghcr.io/cfpb/myapp/main-20260228-abc1234`, ...                               |
+| `short-sha-tag`   | `ghcr.io/cfpb/myapp/abc1234`, ...                                             |
 | `tags`            | `ghcr.io/cfpb/myapp/main-20260228-abc1234,...` (empty for unsupported events) |
 | `pushed`          | `true` or `false`                                                             |
 | `digest`          | `sha256:...` (if pushed)                                                      |
