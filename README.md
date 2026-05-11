@@ -10,12 +10,12 @@ Build, optionally test, and push a Docker image to GHCR.
 
 ### Tagging scheme
 
-| Event            | Tags created                              |
-| ---------------- | ----------------------------------------- |
-| Push to `main`   | `latest`, `main`, `main-20260228-abc1234` |
-| Pull request #42 | `pr-42`, `pr-42-20260228-abc1234`         |
-| Git tag `v1.2.3` | `v1.2.3`                                  |
-| Other            | `local`                                   |
+| Event            | Tags created                                         |
+| ---------------- | ---------------------------------------------------- |
+| Push to `main`   | `latest`, `main`, `main-20260228-abc1234`, `abc1234` |
+| Pull request #42 | `pr-42`, `pr-42-20260228-abc1234`, `abc1234`         |
+| Git tag `v1.2.3` | `v1.2.3`, `abc1234`                                  |
+| Other            | `local`                                              |
 
 ### Usage
 
@@ -44,6 +44,16 @@ jobs:
     image-name: myapp
     token: ${{ secrets.GITHUB_TOKEN }}
     context: ./path/to/dockerfile/
+```
+
+#### Build a specific multi-stage target
+
+```yaml
+- uses: cfpb/actions/docker-build-push@main
+  with:
+    image-name: myapp
+    token: ${{ secrets.GITHUB_TOKEN }}
+    target: base
 ```
 
 #### Skip push (build only)
@@ -75,6 +85,7 @@ Test command receives `IMAGE` as an environment variable.
 | `image-name`   | Yes      | -       | Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)             |
 | `token`        | Yes      | -       | GitHub token for registry authentication                           |
 | `context`      | No       | `.`     | Docker build context                                               |
+| `target`       | No       |         | Multi-stage Dockerfile target to build                             |
 | `skip-push`    | No       | `false` | Skip pushing (build only)                                          |
 | `test-command` | No       |         | Test command to run against built image. Receives `IMAGE` env var. |
 
@@ -88,6 +99,7 @@ Test command receives `IMAGE` as an environment variable.
 | `mutable-tag`     | `ghcr.io/cfpb/myapp/main`, ...                                                |
 | `sha-version`     | `main-20260228-abc1234`, ...                                                  |
 | `sha-tag`         | `ghcr.io/cfpb/myapp/main-20260228-abc1234`, ...                               |
+| `short-sha-tag`   | `ghcr.io/cfpb/myapp/abc1234`, ...                                             |
 | `tags`            | `ghcr.io/cfpb/myapp/main-20260228-abc1234,...` (empty for unsupported events) |
 | `pushed`          | `true` or `false`                                                             |
 | `digest`          | `sha256:...` (if pushed)                                                      |

@@ -5,6 +5,10 @@ inputs:
   image-name:
     description: Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)
     required: true
+  target:
+    description: Target stage to build (optional)
+    required: false
+    default: ''
   token:
     description: GitHub token for registry authentication
     required: true
@@ -40,6 +44,9 @@ outputs:
   sha-tag:
     description: 'SHA-based tag (e.g. ghcr.io/cfpb/myapp:main-abc1234)'
     value: ${{ steps.compute.outputs.sha-tag }}
+  short-sha-tag:
+    description: 'Short commit SHA-based tag (e.g. ghcr.io/cfpb/myapp:abc1234)'
+    value: ${{ steps.compute.outputs.short-sha-tag }}
   tags:
     description: 'All pushable tags, comma-separated'
     value: ${{ steps.compute.outputs.tags }}
@@ -75,6 +82,7 @@ runs:
           SHA="${{ github.sha }}"
         fi
         SHORT_SHA=${SHA:0:7}
+        SHORT_SHA_TAG="${REGISTRY_IMAGE}:${SHORT_SHA}"
 
         # For pushes to main, tag with: main, main-<date>-<sha>, latest
         if [[ "${{ github.event_name }}" == "push"  && "${{ github.ref }}" == "refs/heads/main" ]]; then
@@ -82,7 +90,7 @@ runs:
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
           SHA_VERSION="${MUTABLE_VERSION}-${DATE}-${SHORT_SHA}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
-          TAGS="${MUTABLE_TAG},${SHA_TAG},${REGISTRY_IMAGE}:latest"
+          TAGS="${SHORT_SHA_TAG},${MUTABLE_TAG},${SHA_TAG},${REGISTRY_IMAGE}:latest"
 
         # For PRs, tag with: pr-<pr-num>, pr-<pr-num>-<date>-<sha>
         elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -91,7 +99,7 @@ runs:
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
           SHA_VERSION="${MUTABLE_VERSION}-${DATE}-${SHORT_SHA}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
-          TAGS="${MUTABLE_TAG},${SHA_TAG}"
+          TAGS="${SHORT_SHA_TAG},${MUTABLE_TAG},${SHA_TAG}"
 
         # For tags, tag with tag reference
         elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
@@ -99,7 +107,7 @@ runs:
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
           SHA_VERSION="${MUTABLE_VERSION}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
-          TAGS="${MUTABLE_TAG}"
+          TAGS="${SHORT_SHA_TAG},${MUTABLE_TAG},${SHA_TAG}"
 
         # Otherwise, use "local" for local build only, no tags.
         else
@@ -117,6 +125,7 @@ runs:
         echo "mutable-tag=$MUTABLE_TAG" >> $GITHUB_OUTPUT
         echo "sha-version=$SHA_VERSION" >> $GITHUB_OUTPUT
         echo "sha-tag=$SHA_TAG" >> $GITHUB_OUTPUT
+        echo "short-sha-tag=$SHORT_SHA_TAG" >> $GITHUB_OUTPUT
         echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
         # Markdown output for job summaries.
@@ -129,6 +138,7 @@ runs:
         echo "|mutable-tag|\`$MUTABLE_TAG\`|" >> $GITHUB_STEP_SUMMARY
         echo "|sha-version|\`$SHA_VERSION\`|" >> $GITHUB_STEP_SUMMARY
         echo "|sha-tag|\`$SHA_TAG\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|short-sha-tag|\`$SHORT_SHA_TAG\`|" >> $GITHUB_STEP_SUMMARY
         echo "|tags|\`$TAGS\`|" >> $GITHUB_STEP_SUMMARY
 
     - name: Check if should push
@@ -165,6 +175,7 @@ runs:
         tags: ${{ steps.metadata.outputs.tags || steps.metadata.outputs.mutable-tag }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        target: ${{ inputs.target }}
 
     - name: Run tests
       if: inputs.test-command != ''
