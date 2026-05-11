@@ -5,6 +5,10 @@ inputs:
   image-name:
     description: Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)
     required: true
+  target:
+    description: Target stage to build (optional)
+    required: false
+    default: ''
   token:
     description: GitHub token for registry authentication
     required: true
@@ -166,6 +170,7 @@ runs:
         tags: ${{ steps.metadata.outputs.tags || steps.metadata.outputs.mutable-tag }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        target: ${{ inputs.target }}
 
     - name: Run tests
       if: inputs.test-command != ''
