@@ -107,7 +107,7 @@ runs:
           MUTABLE_TAG="${REGISTRY_IMAGE}:${MUTABLE_VERSION}"
           SHA_VERSION="${MUTABLE_VERSION}"
           SHA_TAG="${REGISTRY_IMAGE}:${SHA_VERSION}"
-          TAGS="${SHORT_SHA_TAG},${SHA_TAG},${MUTABLE_TAG}"
+          TAGS="${SHORT_SHA_TAG},${MUTABLE_TAG},${SHA_TAG}"
 
         # Otherwise, use "local" for local build only, no tags.
         else
