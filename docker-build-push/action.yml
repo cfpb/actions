@@ -24,6 +24,23 @@ inputs:
     description: 'Test command to run against built image. Receives IMAGE env var.'
     required: false
     default: ''
+  scan:
+    description: 'Scan the built image for vulnerabilities before pushing (default: false)'
+    required: false
+    default: false
+  scan-mode:
+    description: '"enforce" (fail job on scan failure) or "report" (default: enforce)'
+    required: false
+    default: 'enforce'
+  scanner-client-id:
+    description: 'Scanner client ID. Scan is skipped if empty.'
+    required: false
+    default: ''
+  scanner-client-secret:
+    description: 'Scanner client secret. Scan is skipped if empty.'
+    required: false
+    default: ''
+
 
 outputs:
   short-sha:
@@ -56,6 +73,9 @@ outputs:
   digest:
     description: 'Image digest (if pushed)'
     value: ${{ steps.push.outputs.digest }}
+  scan-result:
+    description: 'Scan result: "passed", "failed", "skipped", or empty if scanning is disabled'
+    value: ${{ steps.scan.outputs.scan-result }}
 
 runs:
   using: composite
@@ -186,6 +206,61 @@ runs:
         echo "Running: ${{ inputs.test-command }}"
         ${{ inputs.test-command }}
 
+    - name: Scan image
+      id: scan
+      if: inputs.scan == 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.metadata.outputs.sha-tag }}
+        SCAN_MODE: ${{ inputs.scan-mode }}
+        SCANNER_CLI_URL: 'https://downloads.wiz.io/v1/wizcli/latest/wizcli-linux-amd64'
+        WIZ_ENV: fedramp
+        WIZ_CLIENT_ID: ${{ inputs.scanner-client-id }}
+        WIZ_CLIENT_SECRET: ${{ inputs.scanner-client-secret }}
+      run: |
+        set -euo pipefail
+
+        if [[ "$SCAN_MODE" != "enforce" && "$SCAN_MODE" != "report" ]]; then
+          echo "Error: input scan-mode must be \"enforce\" or \"report\""
+          exit 1
+        fi
+
+        echo "### Image scan" >> $GITHUB_STEP_SUMMARY
+
+        if [[ -z "${WIZ_CLIENT_ID:-}" || -z "${WIZ_CLIENT_SECRET:-}" ]]; then
+          echo "::notice::Image scan skipped: scanner credentials not available"
+          echo "scan-result=skipped" >> $GITHUB_OUTPUT
+          echo "Skipped: scanner credentials not available." >> $GITHUB_STEP_SUMMARY
+          exit 0
+        fi
+
+        SCANNER_DIR="$RUNNER_TEMP/scanner"
+        mkdir -p "$SCANNER_DIR"
+        curl -fsSL "$SCANNER_CLI_URL" -o "$SCANNER_DIR/scanner"
+        chmod +x "$SCANNER_DIR/scanner"
+
+        if "$SCANNER_DIR/scanner" scan container-image "$IMAGE"; then
+          RESULT="passed"
+        else
+          RESULT="failed"
+        fi
+
+        echo "scan-result=$RESULT" >> $GITHUB_OUTPUT
+        echo "|Variable|Value" >> $GITHUB_STEP_SUMMARY
+        echo "|-|-|" >> $GITHUB_STEP_SUMMARY
+        echo "|image|\`$IMAGE\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|mode|\`$SCAN_MODE\`|" >> $GITHUB_STEP_SUMMARY
+        echo "|result|\`$RESULT\`|" >> $GITHUB_STEP_SUMMARY
+
+        if [[ "$RESULT" == "failed" ]]; then
+          MESSAGE="Image scan failed; see the scan step output for details"
+          if [[ "$SCAN_MODE" == "enforce" ]]; then
+            echo "::error::$MESSAGE"
+            exit 1
+          fi
+          echo "::warning::$MESSAGE"
+        fi
+
     - name: Log in to registry
       if: steps.should-push.outputs.pushed == 'true'
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -205,6 +280,24 @@ runs:
         docker push "${{ steps.metadata.outputs.registry-image }}" --all-tags | tee $RUNNER_TEMP/docker-push.log
         DIGEST=$(tail -1 $RUNNER_TEMP/docker-push.log | awk '{print $3}')
         echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+
+    - name: Tag scanned image
+      if: >-
+        (steps.scan.outputs.scan-result == 'passed' || steps.scan.outputs.scan-result == 'failed')
+        && steps.push.outputs.digest != ''
+      shell: bash
+      env:
+        IMAGE: ${{ steps.metadata.outputs.sha-tag }}
+        DIGEST: ${{ steps.push.outputs.digest }}
+        WIZ_ENV: fedramp
+        WIZ_CLIENT_ID: ${{ inputs.scanner-client-id }}
+        WIZ_CLIENT_SECRET: ${{ inputs.scanner-client-secret }}
+      run: |
+        set -euo pipefail
+
+        if ! "$RUNNER_TEMP/scanner/scanner" tag "$IMAGE" --digest "$DIGEST"; then
+          echo "::warning::Failed to tag scanned image $IMAGE ($DIGEST) in the scanner"
+        fi
 
     - name: Summary
       shell: bash

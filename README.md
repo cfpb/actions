@@ -4,7 +4,7 @@ Reusable GitHub actions for use by the CFPB organization.
 
 ## docker-build-push
 
-Build, optionally test, and push a Docker image to GHCR.
+Build, optionally test and/or scan, and push a Docker image to GHCR.
 
 **PRs from forks build but never get pushed to GHCR.**
 
@@ -78,16 +78,40 @@ Test command receives `IMAGE` as an environment variable.
     test-command: my-test-command.sh
 ```
 
+#### Scan image before push
+
+Scans the built image with the [Wiz](https://www.wiz.io/) vulnerability scanner.
+
+- `scan-mode: enforce` (default) fails the job, and skips the push, if the scan fails.
+- `scan-mode: report` records the result but always continues.
+
+The scan is skipped if scanner credentials are empty.
+
+```yaml
+- uses: cfpb/actions/docker-build-push@main
+  with:
+    image-name: myapp
+    token: ${{ secrets.GITHUB_TOKEN }}
+    scan: true
+    scan-mode: ${{ github.event_name == 'pull_request' && 'enforce' || 'report' }}
+    scanner-client-id: ${{ secrets.SCANNER_CLIENT_ID }}
+    scanner-client-secret: ${{ secrets.SCANNER_CLIENT_SECRET }}
+```
+
 ### Inputs
 
-| Input          | Required | Default | Description                                                        |
-| -------------- | -------- | ------- | ------------------------------------------------------------------ |
-| `image-name`   | Yes      | -       | Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)             |
-| `token`        | Yes      | -       | GitHub token for registry authentication                           |
-| `context`      | No       | `.`     | Docker build context                                               |
-| `target`       | No       |         | Multi-stage Dockerfile target to build                             |
-| `skip-push`    | No       | `false` | Skip pushing (build only)                                          |
-| `test-command` | No       |         | Test command to run against built image. Receives `IMAGE` env var. |
+| Input                   | Required | Default   | Description                                                        |
+| ----------------------- | -------- | --------- | ------------------------------------------------------------------ |
+| `image-name`            | Yes      | -         | Name for the image (e.g. "myapp" → ghcr.io/cfpb/myapp)             |
+| `token`                 | Yes      | -         | GitHub token for registry authentication                           |
+| `context`               | No       | `.`       | Docker build context                                               |
+| `target`                | No       |           | Multi-stage Dockerfile target to build                             |
+| `skip-push`             | No       | `false`   | Skip pushing (build only)                                          |
+| `test-command`          | No       |           | Test command to run against built image. Receives `IMAGE` env var. |
+| `scan`                  | No       | `false`   | Scan the built image for vulnerabilities before pushing            |
+| `scan-mode`             | No       | `enforce` | `enforce` (fail job on scan failure) or `report`                   |
+| `scanner-client-id`     | No       |           | Scanner client ID. Scan is skipped if empty.                       |
+| `scanner-client-secret` | No       |           | Scanner client secret. Scan is skipped if empty.                   |
 
 ### Outputs
 
@@ -103,3 +127,4 @@ Test command receives `IMAGE` as an environment variable.
 | `tags`            | `ghcr.io/cfpb/myapp/main-20260228-abc1234,...` (empty for unsupported events) |
 | `pushed`          | `true` or `false`                                                             |
 | `digest`          | `sha256:...` (if pushed)                                                      |
+| `scan-result`     | `passed`, `failed`, `skipped`, or empty if `scan` is `false`                  |
